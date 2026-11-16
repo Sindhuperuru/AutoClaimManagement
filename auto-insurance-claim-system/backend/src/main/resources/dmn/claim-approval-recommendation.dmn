@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_ApprovalRecommendation"
+             name="Claim Approval Recommendation Definitions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="claimApprovalRecommendationDecision" name="Claim Approval Recommendation Decision">
+    <decisionTable id="DecisionTable_ApprovalRec" hitPolicy="FIRST">
+      <input id="Input_RecRisk" label="Risk Classification">
+        <inputExpression id="InputExpr_RecRisk" typeRef="string">
+          <text>riskLevel</text>
+        </inputExpression>
+      </input>
+      <input id="Input_RecDocStatus" label="Document Status">
+        <inputExpression id="InputExpr_RecDocStatus" typeRef="string">
+          <text>documentStatus</text>
+        </inputExpression>
+      </input>
+      <input id="Input_RecPoliceStatus" label="Police Report Status">
+        <inputExpression id="InputExpr_RecPoliceStatus" typeRef="string">
+          <text>policeReportStatus</text>
+        </inputExpression>
+      </input>
+      <input id="Input_CoverageRatio" label="Damage vs Sum Insured Ratio">
+        <inputExpression id="InputExpr_CoverageRatio" typeRef="double">
+          <text>damageVsCoverageRatio</text>
+        </inputExpression>
+      </input>
+
+      <output id="Output_Recommendation" label="Recommendation" name="recommendation" typeRef="string" />
+      <output id="Output_Confidence" label="Confidence Score" name="confidenceScore" typeRef="double" />
+      <output id="Output_RecRemarks" label="Remarks" name="recommendationRemarks" typeRef="string" />
+
+      <!-- Rule 1: High risk -> Investigate -->
+      <rule id="Rule_CAR_1">
+        <inputEntry id="IE_CAR_1_1"><text>"HIGH"</text></inputEntry>
+        <inputEntry id="IE_CAR_1_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_1_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_1_4"><text>-</text></inputEntry>
+        <outputEntry id="OE_CAR_1_1"><text>"INVESTIGATE"</text></outputEntry>
+        <outputEntry id="OE_CAR_1_2"><text>0.92</text></outputEntry>
+        <outputEntry id="OE_CAR_1_3"><text>"Elevated risk index triggers Special Investigation Unit inspection"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 2: Incomplete documents -> Reject or Pending -->
+      <rule id="Rule_CAR_2">
+        <inputEntry id="IE_CAR_2_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_2_2"><text>"INCOMPLETE"</text></inputEntry>
+        <inputEntry id="IE_CAR_2_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_2_4"><text>-</text></inputEntry>
+        <outputEntry id="OE_CAR_2_1"><text>"REJECT"</text></outputEntry>
+        <outputEntry id="OE_CAR_2_2"><text>0.85</text></outputEntry>
+        <outputEntry id="OE_CAR_2_3"><text>"Mandatory legal documentation not satisfied"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 3: Discrepant police report -> Investigate -->
+      <rule id="Rule_CAR_3">
+        <inputEntry id="IE_CAR_3_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_3_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_3_3"><text>"DISCREPANCY"</text></inputEntry>
+        <inputEntry id="IE_CAR_3_4"><text>-</text></inputEntry>
+        <outputEntry id="OE_CAR_3_1"><text>"INVESTIGATE"</text></outputEntry>
+        <outputEntry id="OE_CAR_3_2"><text>0.88</text></outputEntry>
+        <outputEntry id="OE_CAR_3_3"><text>"Police accident description conflicts with claimant statement"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 4: Total loss (> 0.75 ratio) -> Approve with Total Loss settlement procedure -->
+      <rule id="Rule_CAR_4">
+        <inputEntry id="IE_CAR_4_1"><text>"LOW","MEDIUM"</text></inputEntry>
+        <inputEntry id="IE_CAR_4_2"><text>"VERIFIED"</text></inputEntry>
+        <inputEntry id="IE_CAR_4_3"><text>"VERIFIED","NOT_REQUIRED"</text></inputEntry>
+        <inputEntry id="IE_CAR_4_4"><text>&gt; 0.75</text></inputEntry>
+        <outputEntry id="OE_CAR_4_1"><text>"APPROVE"</text></outputEntry>
+        <outputEntry id="OE_CAR_4_2"><text>0.95</text></outputEntry>
+        <outputEntry id="OE_CAR_4_3"><text>"Constructive Total Loss: repair costs exceed 75% vehicle insured value"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 5: Standard Low/Medium Risk with verified docs -> Approve -->
+      <rule id="Rule_CAR_5">
+        <inputEntry id="IE_CAR_5_1"><text>"LOW","MEDIUM"</text></inputEntry>
+        <inputEntry id="IE_CAR_5_2"><text>"VERIFIED"</text></inputEntry>
+        <inputEntry id="IE_CAR_5_3"><text>"VERIFIED","NOT_REQUIRED"</text></inputEntry>
+        <inputEntry id="IE_CAR_5_4"><text>&lt;= 0.75</text></inputEntry>
+        <outputEntry id="OE_CAR_5_1"><text>"APPROVE"</text></outputEntry>
+        <outputEntry id="OE_CAR_5_2"><text>0.98</text></outputEntry>
+        <outputEntry id="OE_CAR_5_3"><text>"Standard legitimate claim meets all approval criteria"</text></outputEntry>
+      </rule>
+
+      <!-- Default rule -->
+      <rule id="Rule_CAR_Def">
+        <inputEntry id="IE_CAR_Def_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_Def_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_Def_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_CAR_Def_4"><text>-</text></inputEntry>
+        <outputEntry id="OE_CAR_Def_1"><text>"INVESTIGATE"</text></outputEntry>
+        <outputEntry id="OE_CAR_Def_2"><text>0.70</text></outputEntry>
+        <outputEntry id="OE_CAR_Def_3"><text>"Additional claims officer manual inspection advised"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

@@ -1,0 +1,85 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1862 >>
+stream
+BT
+/F1 18 Tf
+50 740 Td
+(POLICE TRAFFIC ACCIDENT REPORT (FIR)) Tj
+/F1 10 Tf
+0 -25 Td
+(SPRINGFIELD POLICE DEPARTMENT - TRAFFIC ACCIDENT DIVISION) Tj
+0 -16 Td
+(FIRST INFORMATION REPORT \(FIR\) / POLICE TRAFFIC COLLISION LOG) Tj
+0 -16 Td
+(--------------------------------------------------------------------------------) Tj
+0 -16 Td
+(FIR / CASE LOG NUMBER:  FIR-2026-9921) Tj
+0 -16 Td
+(DATE & TIME OF REPORT:  2026-11-16 15:15 CST) Tj
+0 -16 Td
+(INCIDENT LOCATION:      WEST GRAND AVENUE & 5TH STREET INTERSECTION) Tj
+0 -16 Td
+(REPORTING OFFICER:      OFFICER J. HENDRICKS \(#BADGE 408\)) Tj
+0 -16 Td
+(PRECINCT:               CENTRAL 4TH DISTRICT PRECINCT) Tj
+0 -16 Td
+(--------------------------------------------------------------------------------) Tj
+0 -16 Td
+(VEHICLE 1 \(COMPLAINANT\):) Tj
+0 -16 Td
+(  REGISTRATION:         IL-984-XYZ \(TOYOTA CAMRY SE 2022\)) Tj
+0 -16 Td
+(  DRIVER NAME:          JOHNATHAN DOE \(DL-IL-9847291\)) Tj
+0 -16 Td
+(  INSURANCE:            AUTOSURE ENTERPRISE \(POL-2026-88491\)) Tj
+0 -16 Td
+(VEHICLE 2 \(THIRD PARTY\):) Tj
+0 -16 Td
+(  REGISTRATION:         IL-402-BTY \(SUBARU OUTBACK 2020\)) Tj
+0 -16 Td
+(  DRIVER NAME:          MICHAEL CHANG) Tj
+0 -16 Td
+(--------------------------------------------------------------------------------) Tj
+0 -16 Td
+(INCIDENT SUMMARY & OFFICER FINDINGS:) Tj
+0 -16 Td
+(  Vehicle 2 abruptly braked at traffic signal due to pedestrian movement.) Tj
+0 -16 Td
+(  Vehicle 1 experienced wet road slide and made frontal contact at ~15 mph.) Tj
+0 -16 Td
+(  NO INJURIES REPORTED. BOTH PARTIES COOPERATIVE AND SOBER.) Tj
+0 -16 Td
+(  Damage observed: Front bumper reinforcement and right headlamp on Vehicle 1.) Tj
+0 -16 Td
+(--------------------------------------------------------------------------------) Tj
+0 -16 Td
+(DISPOSITION: OFFICIAL TRAFFIC COLLISION RECORD CERTIFIED FOR INSURANCE SETTLEMENT) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000244 00000 n 
+0000000350 +00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+430
+%%EOF

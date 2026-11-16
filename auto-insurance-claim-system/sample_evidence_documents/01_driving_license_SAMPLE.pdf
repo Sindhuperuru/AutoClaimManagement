@@ -1,0 +1,71 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1150 >>
+stream
+BT
+/F1 18 Tf
+50 740 Td
+(STATE OF ILLINOIS DRIVER LICENSE) Tj
+/F1 10 Tf
+0 -25 Td
+(STATE OF ILLINOIS - DEPARTMENT OF MOTOR VEHICLES) Tj
+0 -16 Td
+(OFFICIAL DRIVER LICENSE / PERMIT CERTIFICATE) Tj
+0 -16 Td
+(--------------------------------------------------------------------------------) Tj
+0 -16 Td
+(LICENSE NUMBER:      DL-IL-9847291) Tj
+0 -16 Td
+(NAME:                JOHNATHAN DOE) Tj
+0 -16 Td
+(DATE OF BIRTH:       1988-06-14) Tj
+0 -16 Td
+(SEX:                 MALE          ORGAN DONOR: YES) Tj
+0 -16 Td
+(RESIDENTIAL ADDRESS: 742 EVERGREEN TERRACE, SPRINGFIELD, IL 62704) Tj
+0 -16 Td
+(CLASS:               CLASS D \(OPERATOR - STANDARD VEHICLES\)) Tj
+0 -16 Td
+(ENDORSEMENTS:        NONE) Tj
+0 -16 Td
+(RESTRICTIONS:        CORRECTIVE LENSES) Tj
+0 -16 Td
+(ISSUE DATE:          2022-06-14) Tj
+0 -16 Td
+(EXPIRATION DATE:     2027-06-14 \(VALID & ACTIVE\)) Tj
+0 -16 Td
+(--------------------------------------------------------------------------------) Tj
+0 -16 Td
+(SECURITY CHIP ID:    IL-SEC-492019-V4) Tj
+0 -16 Td
+(AUTHENTICITY CHECK:  BIOMETRIC MATCH CONFIRMED \(100% REGULATORY COMPLIANCE\)) Tj
+0 -16 Td
+(AUTOSURE DIGITAL VERIFICATION PASSED) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000244 00000 n 
+0000000350 +00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+430
+%%EOF

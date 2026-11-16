@@ -1,0 +1,35 @@
+==================================================================
+  AUTO ACCIDENT INSURANCE CLAIM MANAGEMENT SYSTEM
+  Camunda 7 • Spring Boot 3 • SQLite (insurance.db) • React (Vite)
+==================================================================
+
+1. HOW TO RUN THE ENTIRE SYSTEM (1-CLICK LAUNCHER):
+   In this directory or inside auto-insurance-claim-system, run:
+   .\start_system.bat
+
+   This will open:
+   - Backend terminal: Spring Boot 3 + Camunda 7 on http://localhost:8080
+   - Frontend terminal: React (Vite) on http://localhost:3000
+
+2. OPEN WEBSITE IN BROWSER:
+   http://localhost:3000
+
+3. LOGIN CREDENTIALS (PASSWORD: password123 FOR ALL ACCOUNTS):
+   - Customer / Policyholder :  customer1   /  password123
+   - Insurance Agent         :  agent1      /  password123
+   - Claims Officer          :  officer1    /  password123
+   - System Administrator    :  admin1      /  password123
+
+   (Tip: You can also use the 1-Click Role Switcher buttons at the bottom of the Login screen!)
+
+4. HOW TO VIEW & QUERY DATA IN SQLITE:
+   Double-click 'open_sqlite.bat' OR run in terminal:
+   C:\sqlite\sqlite3.exe insurance.db
+
+   Sample Queries:
+   - SELECT * FROM users;
+   - SELECT id, claim_number, status, risk_level, estimated_damage FROM insurance_claims;
+   - SELECT * FROM insurance_policies;
+   - SELECT * FROM settlements;
+   - SELECT * FROM audit_logs;
+==================================================================

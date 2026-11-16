@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_PolicyEligibility"
+             name="Policy Eligibility Definitions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="policyEligibilityDecision" name="Policy Eligibility Decision">
+    <decisionTable id="DecisionTable_PolicyEligibility" hitPolicy="FIRST">
+      <input id="Input_PolicyStatus" label="Policy Status">
+        <inputExpression id="InputExpression_PolicyStatus" typeRef="string">
+          <text>policyStatus</text>
+        </inputExpression>
+      </input>
+      <input id="Input_AccidentCovered" label="Accident Covered Under Policy?">
+        <inputExpression id="InputExpression_AccidentCovered" typeRef="boolean">
+          <text>isAccidentCovered</text>
+        </inputExpression>
+      </input>
+      <input id="Input_PremiumPaid" label="Premium Up To Date?">
+        <inputExpression id="InputExpression_PremiumPaid" typeRef="boolean">
+          <text>premiumPaid</text>
+        </inputExpression>
+      </input>
+      <output id="Output_IsEligible" label="Is Eligible?" name="isEligible" typeRef="boolean" />
+      <output id="Output_Reason" label="Eligibility Reason" name="eligibilityReason" typeRef="string" />
+
+      <rule id="Rule_PE_1">
+        <inputEntry id="IE_PE_1_1"><text>"ACTIVE"</text></inputEntry>
+        <inputEntry id="IE_PE_1_2"><text>true</text></inputEntry>
+        <inputEntry id="IE_PE_1_3"><text>true</text></inputEntry>
+        <outputEntry id="OE_PE_1_1"><text>true</text></outputEntry>
+        <outputEntry id="OE_PE_1_2"><text>"Policy is active and covers reported accident"</text></outputEntry>
+      </rule>
+      <rule id="Rule_PE_2">
+        <inputEntry id="IE_PE_2_1"><text>"EXPIRED"</text></inputEntry>
+        <inputEntry id="IE_PE_2_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_PE_2_3"><text>-</text></inputEntry>
+        <outputEntry id="OE_PE_2_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_PE_2_2"><text>"Policy has expired prior to accident date"</text></outputEntry>
+      </rule>
+      <rule id="Rule_PE_3">
+        <inputEntry id="IE_PE_3_1"><text>"CANCELLED"</text></inputEntry>
+        <inputEntry id="IE_PE_3_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_PE_3_3"><text>-</text></inputEntry>
+        <outputEntry id="OE_PE_3_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_PE_3_2"><text>"Policy was cancelled prior to accident date"</text></outputEntry>
+      </rule>
+      <rule id="Rule_PE_4">
+        <inputEntry id="IE_PE_4_1"><text>"SUSPENDED"</text></inputEntry>
+        <inputEntry id="IE_PE_4_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_PE_4_3"><text>-</text></inputEntry>
+        <outputEntry id="OE_PE_4_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_PE_4_2"><text>"Policy is suspended due to unpaid dues"</text></outputEntry>
+      </rule>
+      <rule id="Rule_PE_5">
+        <inputEntry id="IE_PE_5_1"><text>"ACTIVE"</text></inputEntry>
+        <inputEntry id="IE_PE_5_2"><text>false</text></inputEntry>
+        <inputEntry id="IE_PE_5_3"><text>-</text></inputEntry>
+        <outputEntry id="OE_PE_5_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_PE_5_2"><text>"Reported accident type is excluded from policy coverage"</text></outputEntry>
+      </rule>
+      <rule id="Rule_PE_6">
+        <inputEntry id="IE_PE_6_1"><text>"ACTIVE"</text></inputEntry>
+        <inputEntry id="IE_PE_6_2"><text>true</text></inputEntry>
+        <inputEntry id="IE_PE_6_3"><text>false</text></inputEntry>
+        <outputEntry id="OE_PE_6_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_PE_6_2"><text>"Policy lapse due to defaulted premium payment"</text></outputEntry>
+      </rule>
+      <rule id="Rule_PE_Default">
+        <inputEntry id="IE_PE_Def_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_PE_Def_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_PE_Def_3"><text>-</text></inputEntry>
+        <outputEntry id="OE_PE_Def_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_PE_Def_2"><text>"Ineligible based on policy evaluation"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

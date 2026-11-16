@@ -1,0 +1,613 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_AutoAccidentClaim"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Camunda Modeler"
+                  exporterVersion="5.20.0">
+
+  <bpmn:message id="Message_ReceiveAdditionalDocuments" name="Message_ReceiveAdditionalDocuments" />
+  <bpmn:error id="Error_PaymentFailed" name="Error_PaymentFailed" errorCode="ERR_PAYMENT_FAILED" />
+
+  <bpmn:process id="auto_accident_claim_process" name="Auto Accident Insurance Claim Process" isExecutable="true" camunda:historyTimeToLive="P180D">
+
+    <!-- 1. START EVENT -->
+    <bpmn:startEvent id="claimSubmittedStartEvent" name="Claim Submitted">
+      <bpmn:outgoing>flow_start_to_register</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- 2. SERVICE TASK: REGISTER CLAIM -->
+    <bpmn:serviceTask id="registerClaimTask" name="Register Claim" camunda:delegateExpression="${registerClaimDelegate}">
+      <bpmn:incoming>flow_start_to_register</bpmn:incoming>
+      <bpmn:outgoing>flow_register_to_gen_id</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 3. SERVICE TASK: GENERATE UNIQUE CLAIM ID -->
+    <bpmn:serviceTask id="generateClaimIdTask" name="Generate Unique Claim ID" camunda:delegateExpression="${generateClaimIdDelegate}">
+      <bpmn:incoming>flow_register_to_gen_id</bpmn:incoming>
+      <bpmn:outgoing>flow_gen_id_to_validate_policy</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 4. SERVICE TASK: VALIDATE POLICY DETAILS -->
+    <bpmn:serviceTask id="validatePolicyTask" name="Validate Policy Details" camunda:delegateExpression="${validatePolicyDelegate}">
+      <bpmn:incoming>flow_gen_id_to_validate_policy</bpmn:incoming>
+      <bpmn:outgoing>flow_validate_policy_to_gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 5. EXCLUSIVE GATEWAY: POLICY VALID? -->
+    <bpmn:exclusiveGateway id="gatewayPolicyValid" name="Policy Valid?">
+      <bpmn:incoming>flow_validate_policy_to_gw</bpmn:incoming>
+      <bpmn:outgoing>flow_policy_valid</bpmn:outgoing>
+      <bpmn:outgoing>flow_policy_invalid</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- 6. SERVICE TASK: VERIFY CUSTOMER DETAILS -->
+    <bpmn:serviceTask id="verifyCustomerTask" name="Verify Customer Details" camunda:delegateExpression="${verifyCustomerDelegate}">
+      <bpmn:incoming>flow_policy_valid</bpmn:incoming>
+      <bpmn:outgoing>flow_customer_to_agent</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 7. USER TASK: AGENT DOCUMENT VERIFICATION -->
+    <bpmn:userTask id="agentDocVerificationTask" name="Agent Document Verification" camunda:candidateGroups="AGENTS" camunda:assignee="${agentAssignee}">
+      <bpmn:incoming>flow_customer_to_agent</bpmn:incoming>
+      <bpmn:incoming>flow_sub_to_agent</bpmn:incoming>
+      <bpmn:outgoing>flow_agent_to_docs_gw</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 8. EXCLUSIVE GATEWAY: DOCUMENTS COMPLETE? -->
+    <bpmn:exclusiveGateway id="gatewayDocsComplete" name="Documents Complete?">
+      <bpmn:incoming>flow_agent_to_docs_gw</bpmn:incoming>
+      <bpmn:outgoing>flow_docs_complete</bpmn:outgoing>
+      <bpmn:outgoing>flow_docs_incomplete</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- 9. SERVICE TASK: REQUEST ADDITIONAL DOCUMENTS -->
+    <bpmn:serviceTask id="requestAdditionalDocsTask" name="Request Additional Documents" camunda:delegateExpression="${requestAdditionalDocsDelegate}">
+      <bpmn:incoming>flow_docs_incomplete</bpmn:incoming>
+      <bpmn:outgoing>flow_req_to_sub</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- SUBPROCESS FOR WAITING WITH TIMEOUT -->
+    <bpmn:subProcess id="docWaitingSubprocess" name="Document Submission Subprocess">
+      <bpmn:incoming>flow_req_to_sub</bpmn:incoming>
+      <bpmn:outgoing>flow_sub_to_agent</bpmn:outgoing>
+
+      <bpmn:startEvent id="subStartEvent" name="Wait Start">
+        <bpmn:outgoing>flow_sub_start_to_catch</bpmn:outgoing>
+      </bpmn:startEvent>
+
+      <bpmn:intermediateCatchEvent id="receiveDocsMessageEvent" name="Receive Additional Documents">
+        <bpmn:incoming>flow_sub_start_to_catch</bpmn:incoming>
+        <bpmn:outgoing>flow_catch_to_sub_end</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="MsgDef_DocReceived" messageRef="Message_ReceiveAdditionalDocuments" />
+      </bpmn:intermediateCatchEvent>
+
+      <bpmn:endEvent id="subEndEvent" name="Documents Arrived">
+        <bpmn:incoming>flow_catch_to_sub_end</bpmn:incoming>
+      </bpmn:endEvent>
+
+      <bpmn:sequenceFlow id="flow_sub_start_to_catch" sourceRef="subStartEvent" targetRef="receiveDocsMessageEvent" />
+      <bpmn:sequenceFlow id="flow_catch_to_sub_end" sourceRef="receiveDocsMessageEvent" targetRef="subEndEvent" />
+    </bpmn:subProcess>
+
+    <!-- BOUNDARY TIMER EVENT: 7 DAYS (OR TEST OVERRIDE PT1H) -->
+    <bpmn:boundaryEvent id="docTimeoutBoundaryTimer" name="Doc Submission Timeout" attachedToRef="docWaitingSubprocess">
+      <bpmn:outgoing>flow_timeout_to_proc</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_DocTimeout">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${docTimeoutDuration}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <!-- TIMEOUT HANDLER TASK -->
+    <bpmn:serviceTask id="docTimeoutTask" name="Process Document Timeout" camunda:delegateExpression="${documentTimeoutDelegate}">
+      <bpmn:incoming>flow_timeout_to_proc</bpmn:incoming>
+      <bpmn:outgoing>flow_timeout_to_rejection</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 10. SERVICE TASK: VALIDATE ACCIDENT INFORMATION -->
+    <bpmn:serviceTask id="validateAccidentInfoTask" name="Validate Accident Information" camunda:delegateExpression="${validateAccidentInfoDelegate}">
+      <bpmn:incoming>flow_docs_complete</bpmn:incoming>
+      <bpmn:outgoing>flow_accident_to_damage_calc</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 11. SERVICE TASK: CALCULATE INITIAL DAMAGE ESTIMATE -->
+    <bpmn:serviceTask id="calculateInitialDamageTask" name="Calculate Initial Damage Estimate" camunda:delegateExpression="${calculateInitialDamageDelegate}">
+      <bpmn:incoming>flow_accident_to_damage_calc</bpmn:incoming>
+      <bpmn:outgoing>flow_damage_to_dmn</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 12. BUSINESS RULE TASK: EVALUATE CLAIM USING DMN -->
+    <bpmn:businessRuleTask id="evaluateClaimDmnTask" name="Evaluate Claim Risk (DMN)"
+                            camunda:decisionRef="claimRiskAssessmentDecision"
+                            camunda:resultVariable="riskDecisionResult"
+                            camunda:mapDecisionResult="singleResult">
+      <bpmn:incoming>flow_damage_to_dmn</bpmn:incoming>
+      <bpmn:outgoing>flow_dmn_to_risk_gw</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+
+    <!-- 13. EXCLUSIVE GATEWAY: RISK CLASSIFICATION -->
+    <bpmn:exclusiveGateway id="gatewayRiskClass" name="Claim Risk Classification" default="flow_risk_low">
+      <bpmn:incoming>flow_dmn_to_risk_gw</bpmn:incoming>
+      <bpmn:outgoing>flow_risk_low</bpmn:outgoing>
+      <bpmn:outgoing>flow_risk_medium</bpmn:outgoing>
+      <bpmn:outgoing>flow_risk_high</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- LOW RISK PATH -->
+    <bpmn:serviceTask id="standardProcessingTask" name="Standard Claim Processing" camunda:delegateExpression="${standardClaimProcessingDelegate}">
+      <bpmn:incoming>flow_risk_low</bpmn:incoming>
+      <bpmn:outgoing>flow_standard_to_parallel</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- MEDIUM RISK PATH -->
+    <bpmn:serviceTask id="additionalVerificationTask" name="Additional Verification" camunda:delegateExpression="${additionalVerificationDelegate}">
+      <bpmn:incoming>flow_risk_medium</bpmn:incoming>
+      <bpmn:outgoing>flow_additional_to_parallel</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- HIGH RISK PATH -->
+    <bpmn:serviceTask id="fraudInvestigationPrepTask" name="Fraud Investigation Flagging" camunda:delegateExpression="${fraudInvestigationDelegate}">
+      <bpmn:incoming>flow_risk_high</bpmn:incoming>
+      <bpmn:outgoing>flow_fraud_to_parallel</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 14. PARALLEL GATEWAY: PARALLEL VERIFICATION -->
+    <bpmn:parallelGateway id="parallelGatewayFork" name="Parallel Verification Fork">
+      <bpmn:incoming>flow_standard_to_parallel</bpmn:incoming>
+      <bpmn:incoming>flow_additional_to_parallel</bpmn:incoming>
+      <bpmn:incoming>flow_fraud_to_parallel</bpmn:incoming>
+      <bpmn:outgoing>flow_fork_to_police</bpmn:outgoing>
+      <bpmn:outgoing>flow_fork_to_workshop</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:serviceTask id="policeFirVerificationTask" name="Police FIR Verification" camunda:delegateExpression="${policeFirVerificationDelegate}">
+      <bpmn:incoming>flow_fork_to_police</bpmn:incoming>
+      <bpmn:outgoing>flow_police_to_join</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="workshopEstimateVerificationTask" name="Workshop Estimate Verification" camunda:delegateExpression="${workshopEstimateVerificationDelegate}">
+      <bpmn:incoming>flow_fork_to_workshop</bpmn:incoming>
+      <bpmn:outgoing>flow_workshop_to_join</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:parallelGateway id="parallelGatewayJoin" name="Parallel Verification Join">
+      <bpmn:incoming>flow_police_to_join</bpmn:incoming>
+      <bpmn:incoming>flow_workshop_to_join</bpmn:incoming>
+      <bpmn:outgoing>flow_join_to_officer</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <!-- 15. USER TASK: CLAIMS OFFICER REVIEW -->
+    <bpmn:userTask id="claimsOfficerReviewTask" name="Claims Officer Review" camunda:candidateGroups="CLAIMS_OFFICERS" camunda:assignee="${officerAssignee}">
+      <bpmn:incoming>flow_join_to_officer</bpmn:incoming>
+      <bpmn:incoming>flow_inv_to_officer</bpmn:incoming>
+      <bpmn:outgoing>flow_officer_to_decision_gw</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 16. EXCLUSIVE GATEWAY: FINAL DECISION -->
+    <bpmn:exclusiveGateway id="gatewayFinalDecision" name="Final Decision?">
+      <bpmn:incoming>flow_officer_to_decision_gw</bpmn:incoming>
+      <bpmn:outgoing>flow_decision_approved</bpmn:outgoing>
+      <bpmn:outgoing>flow_decision_rejected</bpmn:outgoing>
+      <bpmn:outgoing>flow_decision_investigate</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- INVESTIGATION TASK IF OFFICER REQUESTS -->
+    <bpmn:userTask id="specialInvestigationTask" name="Special Investigation Review" camunda:candidateGroups="INVESTIGATORS">
+      <bpmn:incoming>flow_decision_investigate</bpmn:incoming>
+      <bpmn:outgoing>flow_inv_to_officer</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- APPROVAL BRANCH -->
+    <!-- 17. BUSINESS RULE TASK: SETTLEMENT CALCULATION (DMN) -->
+    <bpmn:businessRuleTask id="calculateSettlementDmnTask" name="Calculate Settlement Amount (DMN)"
+                            camunda:decisionRef="settlementCalculationDecision"
+                            camunda:resultVariable="settlementDecisionResult"
+                            camunda:mapDecisionResult="singleResult">
+      <bpmn:incoming>flow_decision_approved</bpmn:incoming>
+      <bpmn:outgoing>flow_settlement_calc_to_details</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+
+    <!-- 18. SERVICE TASK: GENERATE SETTLEMENT DETAILS -->
+    <bpmn:serviceTask id="generateSettlementDetailsTask" name="Generate Settlement Details" camunda:delegateExpression="${generateSettlementDetailsDelegate}">
+      <bpmn:incoming>flow_settlement_calc_to_details</bpmn:incoming>
+      <bpmn:outgoing>flow_settlement_to_auth</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 19. USER TASK: FINAL AUTHORIZATION -->
+    <bpmn:userTask id="finalAuthorizationTask" name="Final Settlement Authorization" camunda:candidateGroups="ADMINS">
+      <bpmn:incoming>flow_settlement_to_auth</bpmn:incoming>
+      <bpmn:outgoing>flow_auth_to_payment</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 20. SERVICE TASK: PROCESS PAYMENT SIMULATION -->
+    <bpmn:serviceTask id="processPaymentSimulationTask" name="Process Payment Simulation" camunda:delegateExpression="${paymentSimulationDelegate}">
+      <bpmn:incoming>flow_auth_to_payment</bpmn:incoming>
+      <bpmn:outgoing>flow_payment_to_report</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- BOUNDARY ERROR ON PAYMENT SIMULATION -->
+    <bpmn:boundaryEvent id="paymentFailureBoundaryEvent" name="Payment Failed" attachedToRef="processPaymentSimulationTask">
+      <bpmn:outgoing>flow_payment_error_to_retry</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_PaymentFailed" errorRef="Error_PaymentFailed" />
+    </bpmn:boundaryEvent>
+
+    <bpmn:userTask id="manualPaymentResolutionTask" name="Manual Payment Resolution" camunda:candidateGroups="ADMINS">
+      <bpmn:incoming>flow_payment_error_to_retry</bpmn:incoming>
+      <bpmn:outgoing>flow_retry_to_report</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 21. SERVICE TASK: GENERATE SETTLEMENT REPORT -->
+    <bpmn:serviceTask id="generateSettlementReportTask" name="Generate Settlement Report" camunda:delegateExpression="${generateSettlementReportDelegate}">
+      <bpmn:incoming>flow_payment_to_report</bpmn:incoming>
+      <bpmn:incoming>flow_retry_to_report</bpmn:incoming>
+      <bpmn:outgoing>flow_report_to_notify_approval</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 22. SERVICE TASK: NOTIFY CUSTOMER APPROVAL -->
+    <bpmn:serviceTask id="notifyCustomerApprovalTask" name="Notify Customer (Approval)" camunda:delegateExpression="${notifyCustomerDelegate}">
+      <bpmn:incoming>flow_report_to_notify_approval</bpmn:incoming>
+      <bpmn:outgoing>flow_notify_approval_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="claimCompletedEndEvent" name="Claim Approved &amp; Settled">
+      <bpmn:incoming>flow_notify_approval_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- REJECTION PATH -->
+    <!-- 23. SERVICE TASK: GENERATE REJECTION REASON -->
+    <bpmn:serviceTask id="generateRejectionReasonTask" name="Generate Rejection Reason" camunda:delegateExpression="${generateRejectionReasonDelegate}">
+      <bpmn:incoming>flow_policy_invalid</bpmn:incoming>
+      <bpmn:incoming>flow_timeout_to_rejection</bpmn:incoming>
+      <bpmn:incoming>flow_decision_rejected</bpmn:incoming>
+      <bpmn:outgoing>flow_rejection_to_notify</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 24. SERVICE TASK: NOTIFY CUSTOMER REJECTION -->
+    <bpmn:serviceTask id="notifyCustomerRejectionTask" name="Notify Customer (Rejection)" camunda:delegateExpression="${notifyCustomerDelegate}">
+      <bpmn:incoming>flow_rejection_to_notify</bpmn:incoming>
+      <bpmn:outgoing>flow_notify_rejection_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="claimRejectedEndEvent" name="Claim Rejected">
+      <bpmn:incoming>flow_notify_rejection_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- SEQUENCE FLOWS WITH EXPLICIT CONDITIONS -->
+    <bpmn:sequenceFlow id="flow_start_to_register" sourceRef="claimSubmittedStartEvent" targetRef="registerClaimTask" />
+    <bpmn:sequenceFlow id="flow_register_to_gen_id" sourceRef="registerClaimTask" targetRef="generateClaimIdTask" />
+    <bpmn:sequenceFlow id="flow_gen_id_to_validate_policy" sourceRef="generateClaimIdTask" targetRef="validatePolicyTask" />
+    <bpmn:sequenceFlow id="flow_validate_policy_to_gw" sourceRef="validatePolicyTask" targetRef="gatewayPolicyValid" />
+
+    <bpmn:sequenceFlow id="flow_policy_valid" name="Valid" sourceRef="gatewayPolicyValid" targetRef="verifyCustomerTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${isPolicyValid == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_policy_invalid" name="Invalid" sourceRef="gatewayPolicyValid" targetRef="generateRejectionReasonTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${isPolicyValid == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="flow_customer_to_agent" sourceRef="verifyCustomerTask" targetRef="agentDocVerificationTask" />
+    <bpmn:sequenceFlow id="flow_agent_to_docs_gw" sourceRef="agentDocVerificationTask" targetRef="gatewayDocsComplete" />
+
+    <bpmn:sequenceFlow id="flow_docs_complete" name="Complete" sourceRef="gatewayDocsComplete" targetRef="validateAccidentInfoTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${documentsComplete == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_docs_incomplete" name="Incomplete" sourceRef="gatewayDocsComplete" targetRef="requestAdditionalDocsTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${documentsComplete == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="flow_req_to_sub" sourceRef="requestAdditionalDocsTask" targetRef="docWaitingSubprocess" />
+    <bpmn:sequenceFlow id="flow_sub_to_agent" sourceRef="docWaitingSubprocess" targetRef="agentDocVerificationTask" />
+    <bpmn:sequenceFlow id="flow_timeout_to_proc" sourceRef="docTimeoutBoundaryTimer" targetRef="docTimeoutTask" />
+    <bpmn:sequenceFlow id="flow_timeout_to_rejection" sourceRef="docTimeoutTask" targetRef="generateRejectionReasonTask" />
+
+    <bpmn:sequenceFlow id="flow_accident_to_damage_calc" sourceRef="validateAccidentInfoTask" targetRef="calculateInitialDamageTask" />
+    <bpmn:sequenceFlow id="flow_damage_to_dmn" sourceRef="calculateInitialDamageTask" targetRef="evaluateClaimDmnTask" />
+    <bpmn:sequenceFlow id="flow_dmn_to_risk_gw" sourceRef="evaluateClaimDmnTask" targetRef="gatewayRiskClass" />
+
+    <bpmn:sequenceFlow id="flow_risk_low" name="Low Risk" sourceRef="gatewayRiskClass" targetRef="standardProcessingTask" />
+    <bpmn:sequenceFlow id="flow_risk_medium" name="Medium Risk" sourceRef="gatewayRiskClass" targetRef="additionalVerificationTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(riskDecisionResult != null and riskDecisionResult['claimRisk'] == 'MEDIUM') or claimRisk == 'MEDIUM'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_risk_high" name="High Risk" sourceRef="gatewayRiskClass" targetRef="fraudInvestigationPrepTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(riskDecisionResult != null and riskDecisionResult['claimRisk'] == 'HIGH') or claimRisk == 'HIGH'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="flow_standard_to_parallel" sourceRef="standardProcessingTask" targetRef="parallelGatewayFork" />
+    <bpmn:sequenceFlow id="flow_additional_to_parallel" sourceRef="additionalVerificationTask" targetRef="parallelGatewayFork" />
+    <bpmn:sequenceFlow id="flow_fraud_to_parallel" sourceRef="fraudInvestigationPrepTask" targetRef="parallelGatewayFork" />
+
+    <bpmn:sequenceFlow id="flow_fork_to_police" sourceRef="parallelGatewayFork" targetRef="policeFirVerificationTask" />
+    <bpmn:sequenceFlow id="flow_fork_to_workshop" sourceRef="parallelGatewayFork" targetRef="workshopEstimateVerificationTask" />
+
+    <bpmn:sequenceFlow id="flow_police_to_join" sourceRef="policeFirVerificationTask" targetRef="parallelGatewayJoin" />
+    <bpmn:sequenceFlow id="flow_workshop_to_join" sourceRef="workshopEstimateVerificationTask" targetRef="parallelGatewayJoin" />
+
+    <bpmn:sequenceFlow id="flow_join_to_officer" sourceRef="parallelGatewayJoin" targetRef="claimsOfficerReviewTask" />
+    <bpmn:sequenceFlow id="flow_officer_to_decision_gw" sourceRef="claimsOfficerReviewTask" targetRef="gatewayFinalDecision" />
+
+    <bpmn:sequenceFlow id="flow_decision_approved" name="Approved" sourceRef="gatewayFinalDecision" targetRef="calculateSettlementDmnTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${officerDecision == 'APPROVED'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_decision_rejected" name="Rejected" sourceRef="gatewayFinalDecision" targetRef="generateRejectionReasonTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${officerDecision == 'REJECTED'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_decision_investigate" name="Investigate" sourceRef="gatewayFinalDecision" targetRef="specialInvestigationTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${officerDecision == 'INVESTIGATE'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_inv_to_officer" sourceRef="specialInvestigationTask" targetRef="claimsOfficerReviewTask" />
+
+    <bpmn:sequenceFlow id="flow_settlement_calc_to_details" sourceRef="calculateSettlementDmnTask" targetRef="generateSettlementDetailsTask" />
+    <bpmn:sequenceFlow id="flow_settlement_to_auth" sourceRef="generateSettlementDetailsTask" targetRef="finalAuthorizationTask" />
+    <bpmn:sequenceFlow id="flow_auth_to_payment" sourceRef="finalAuthorizationTask" targetRef="processPaymentSimulationTask" />
+
+    <bpmn:sequenceFlow id="flow_payment_to_report" sourceRef="processPaymentSimulationTask" targetRef="generateSettlementReportTask" />
+    <bpmn:sequenceFlow id="flow_payment_error_to_retry" sourceRef="paymentFailureBoundaryEvent" targetRef="manualPaymentResolutionTask" />
+    <bpmn:sequenceFlow id="flow_retry_to_report" sourceRef="manualPaymentResolutionTask" targetRef="generateSettlementReportTask" />
+
+    <bpmn:sequenceFlow id="flow_report_to_notify_approval" sourceRef="generateSettlementReportTask" targetRef="notifyCustomerApprovalTask" />
+    <bpmn:sequenceFlow id="flow_notify_approval_to_end" sourceRef="notifyCustomerApprovalTask" targetRef="claimCompletedEndEvent" />
+
+    <bpmn:sequenceFlow id="flow_rejection_to_notify" sourceRef="generateRejectionReasonTask" targetRef="notifyCustomerRejectionTask" />
+    <bpmn:sequenceFlow id="flow_notify_rejection_to_end" sourceRef="notifyCustomerRejectionTask" targetRef="claimRejectedEndEvent" />
+
+  </bpmn:process>
+
+  <!-- BPMN 2.0 VISUAL DIAGRAM LAYOUT METADATA -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="auto_accident_claim_process">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="claimSubmittedStartEvent">
+        <dc:Bounds x="152" y="192" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="130" y="235" width="81" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="registerClaimTask_di" bpmnElement="registerClaimTask">
+        <dc:Bounds x="240" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="generateClaimIdTask_di" bpmnElement="generateClaimIdTask">
+        <dc:Bounds x="390" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="validatePolicyTask_di" bpmnElement="validatePolicyTask">
+        <dc:Bounds x="540" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gatewayPolicyValid_di" bpmnElement="gatewayPolicyValid" isMarkerVisible="true">
+        <dc:Bounds x="695" y="185" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="689" y="155" width="63" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="verifyCustomerTask_di" bpmnElement="verifyCustomerTask">
+        <dc:Bounds x="800" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="agentDocVerificationTask_di" bpmnElement="agentDocVerificationTask">
+        <dc:Bounds x="950" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gatewayDocsComplete_di" bpmnElement="gatewayDocsComplete" isMarkerVisible="true">
+        <dc:Bounds x="1105" y="185" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1098" y="155" width="64" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="requestAdditionalDocsTask_di" bpmnElement="requestAdditionalDocsTask">
+        <dc:Bounds x="1190" y="40" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="docWaitingSubprocess_di" bpmnElement="docWaitingSubprocess" isExpanded="false">
+        <dc:Bounds x="1360" y="40" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="docTimeoutTask_di" bpmnElement="docTimeoutTask">
+        <dc:Bounds x="1540" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="validateAccidentInfoTask_di" bpmnElement="validateAccidentInfoTask">
+        <dc:Bounds x="1210" y="170" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="calculateInitialDamageTask_di" bpmnElement="calculateInitialDamageTask">
+        <dc:Bounds x="1370" y="170" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="evaluateClaimDmnTask_di" bpmnElement="evaluateClaimDmnTask">
+        <dc:Bounds x="1530" y="170" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gatewayRiskClass_di" bpmnElement="gatewayRiskClass" isMarkerVisible="true">
+        <dc:Bounds x="1695" y="185" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1685" y="148" width="71" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="standardProcessingTask_di" bpmnElement="standardProcessingTask">
+        <dc:Bounds x="1800" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="additionalVerificationTask_di" bpmnElement="additionalVerificationTask">
+        <dc:Bounds x="1800" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fraudInvestigationPrepTask_di" bpmnElement="fraudInvestigationPrepTask">
+        <dc:Bounds x="1800" y="280" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="parallelGatewayFork_di" bpmnElement="parallelGatewayFork">
+        <dc:Bounds x="1955" y="185" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="policeFirVerificationTask_di" bpmnElement="policeFirVerificationTask">
+        <dc:Bounds x="2040" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="workshopEstimateVerificationTask_di" bpmnElement="workshopEstimateVerificationTask">
+        <dc:Bounds x="2040" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="parallelGatewayJoin_di" bpmnElement="parallelGatewayJoin">
+        <dc:Bounds x="2185" y="185" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="claimsOfficerReviewTask_di" bpmnElement="claimsOfficerReviewTask">
+        <dc:Bounds x="2280" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gatewayFinalDecision_di" bpmnElement="gatewayFinalDecision" isMarkerVisible="true">
+        <dc:Bounds x="2435" y="185" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2422" y="155" width="76" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="specialInvestigationTask_di" bpmnElement="specialInvestigationTask">
+        <dc:Bounds x="2410" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="calculateSettlementDmnTask_di" bpmnElement="calculateSettlementDmnTask">
+        <dc:Bounds x="2540" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="generateSettlementDetailsTask_di" bpmnElement="generateSettlementDetailsTask">
+        <dc:Bounds x="2690" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="finalAuthorizationTask_di" bpmnElement="finalAuthorizationTask">
+        <dc:Bounds x="2840" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="processPaymentSimulationTask_di" bpmnElement="processPaymentSimulationTask">
+        <dc:Bounds x="2990" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="manualPaymentResolutionTask_di" bpmnElement="manualPaymentResolutionTask">
+        <dc:Bounds x="3090" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="generateSettlementReportTask_di" bpmnElement="generateSettlementReportTask">
+        <dc:Bounds x="3200" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="notifyCustomerApprovalTask_di" bpmnElement="notifyCustomerApprovalTask">
+        <dc:Bounds x="3350" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="claimCompletedEndEvent_di" bpmnElement="claimCompletedEndEvent">
+        <dc:Bounds x="3502" y="192" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="3480" y="235" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="generateRejectionReasonTask_di" bpmnElement="generateRejectionReasonTask">
+        <dc:Bounds x="2410" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="notifyCustomerRejectionTask_di" bpmnElement="notifyCustomerRejectionTask">
+        <dc:Bounds x="2560" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="claimRejectedEndEvent_di" bpmnElement="claimRejectedEndEvent">
+        <dc:Bounds x="2712" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2693" y="445" width="75" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="docTimeoutBoundaryTimer_di" bpmnElement="docTimeoutBoundaryTimer">
+        <dc:Bounds x="1482" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1518" y="123" width="83" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="paymentFailureBoundaryEvent_di" bpmnElement="paymentFailureBoundaryEvent">
+        <dc:Bounds x="3072" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="3052" y="128" width="76" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow_start_to_register_di" bpmnElement="flow_start_to_register">
+        <di:waypoint x="188" y="210" /><di:waypoint x="240" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_register_to_gen_id_di" bpmnElement="flow_register_to_gen_id">
+        <di:waypoint x="340" y="210" /><di:waypoint x="390" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_gen_id_to_validate_policy_di" bpmnElement="flow_gen_id_to_validate_policy">
+        <di:waypoint x="490" y="210" /><di:waypoint x="540" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_validate_policy_to_gw_di" bpmnElement="flow_validate_policy_to_gw">
+        <di:waypoint x="640" y="210" /><di:waypoint x="695" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_policy_valid_di" bpmnElement="flow_policy_valid">
+        <di:waypoint x="745" y="210" /><di:waypoint x="800" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_policy_invalid_di" bpmnElement="flow_policy_invalid">
+        <di:waypoint x="720" y="235" /><di:waypoint x="720" y="420" /><di:waypoint x="2410" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_customer_to_agent_di" bpmnElement="flow_customer_to_agent">
+        <di:waypoint x="900" y="210" /><di:waypoint x="950" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_agent_to_docs_gw_di" bpmnElement="flow_agent_to_docs_gw">
+        <di:waypoint x="1050" y="210" /><di:waypoint x="1105" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_docs_complete_di" bpmnElement="flow_docs_complete">
+        <di:waypoint x="1155" y="210" /><di:waypoint x="1210" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_docs_incomplete_di" bpmnElement="flow_docs_incomplete">
+        <di:waypoint x="1130" y="185" /><di:waypoint x="1130" y="80" /><di:waypoint x="1190" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_req_to_sub_di" bpmnElement="flow_req_to_sub">
+        <di:waypoint x="1310" y="80" /><di:waypoint x="1360" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_timeout_to_proc_di" bpmnElement="flow_timeout_to_proc">
+        <di:waypoint x="1500" y="102" /><di:waypoint x="1500" y="80" /><di:waypoint x="1540" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_timeout_to_rejection_di" bpmnElement="flow_timeout_to_rejection">
+        <di:waypoint x="1640" y="80" /><di:waypoint x="1660" y="80" /><di:waypoint x="1660" y="420" /><di:waypoint x="2410" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_accident_to_damage_calc_di" bpmnElement="flow_accident_to_damage_calc">
+        <di:waypoint x="1320" y="210" /><di:waypoint x="1370" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_damage_to_dmn_di" bpmnElement="flow_damage_to_dmn">
+        <di:waypoint x="1480" y="210" /><di:waypoint x="1530" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_dmn_to_risk_gw_di" bpmnElement="flow_dmn_to_risk_gw">
+        <di:waypoint x="1640" y="210" /><di:waypoint x="1695" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_risk_low_di" bpmnElement="flow_risk_low">
+        <di:waypoint x="1720" y="185" /><di:waypoint x="1720" y="140" /><di:waypoint x="1800" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_risk_medium_di" bpmnElement="flow_risk_medium">
+        <di:waypoint x="1745" y="210" /><di:waypoint x="1800" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_risk_high_di" bpmnElement="flow_risk_high">
+        <di:waypoint x="1720" y="235" /><di:waypoint x="1720" y="320" /><di:waypoint x="1800" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_standard_to_parallel_di" bpmnElement="flow_standard_to_parallel">
+        <di:waypoint x="1900" y="140" /><di:waypoint x="1980" y="140" /><di:waypoint x="1980" y="185" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_additional_to_parallel_di" bpmnElement="flow_additional_to_parallel">
+        <di:waypoint x="1900" y="210" /><di:waypoint x="1955" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_fraud_to_parallel_di" bpmnElement="flow_fraud_to_parallel">
+        <di:waypoint x="1900" y="320" /><di:waypoint x="1980" y="320" /><di:waypoint x="1980" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_fork_to_police_di" bpmnElement="flow_fork_to_police">
+        <di:waypoint x="1980" y="185" /><di:waypoint x="1980" y="160" /><di:waypoint x="2040" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_fork_to_workshop_di" bpmnElement="flow_fork_to_workshop">
+        <di:waypoint x="1980" y="235" /><di:waypoint x="1980" y="270" /><di:waypoint x="2040" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_police_to_join_di" bpmnElement="flow_police_to_join">
+        <di:waypoint x="2140" y="160" /><di:waypoint x="2210" y="160" /><di:waypoint x="2210" y="185" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_workshop_to_join_di" bpmnElement="flow_workshop_to_join">
+        <di:waypoint x="2140" y="270" /><di:waypoint x="2210" y="270" /><di:waypoint x="2210" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_join_to_officer_di" bpmnElement="flow_join_to_officer">
+        <di:waypoint x="2235" y="210" /><di:waypoint x="2280" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_officer_to_decision_gw_di" bpmnElement="flow_officer_to_decision_gw">
+        <di:waypoint x="2380" y="210" /><di:waypoint x="2435" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_decision_approved_di" bpmnElement="flow_decision_approved">
+        <di:waypoint x="2485" y="210" /><di:waypoint x="2540" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_decision_rejected_di" bpmnElement="flow_decision_rejected">
+        <di:waypoint x="2460" y="235" /><di:waypoint x="2460" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_decision_investigate_di" bpmnElement="flow_decision_investigate">
+        <di:waypoint x="2460" y="185" /><di:waypoint x="2460" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_inv_to_officer_di" bpmnElement="flow_inv_to_officer">
+        <di:waypoint x="2410" y="80" /><di:waypoint x="2330" y="80" /><di:waypoint x="2330" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_settlement_calc_to_details_di" bpmnElement="flow_settlement_calc_to_details">
+        <di:waypoint x="2640" y="210" /><di:waypoint x="2690" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_settlement_to_auth_di" bpmnElement="flow_settlement_to_auth">
+        <di:waypoint x="2790" y="210" /><di:waypoint x="2840" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_auth_to_payment_di" bpmnElement="flow_auth_to_payment">
+        <di:waypoint x="2940" y="210" /><di:waypoint x="2990" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_payment_to_report_di" bpmnElement="flow_payment_to_report">
+        <di:waypoint x="3090" y="210" /><di:waypoint x="3200" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_payment_error_to_retry_di" bpmnElement="flow_payment_error_to_retry">
+        <di:waypoint x="3090" y="152" /><di:waypoint x="3090" y="80" /><di:waypoint x="3090" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_retry_to_report_di" bpmnElement="flow_retry_to_report">
+        <di:waypoint x="3190" y="80" /><di:waypoint x="3250" y="80" /><di:waypoint x="3250" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_report_to_notify_approval_di" bpmnElement="flow_report_to_notify_approval">
+        <di:waypoint x="3300" y="210" /><di:waypoint x="3350" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_notify_approval_to_end_di" bpmnElement="flow_notify_approval_to_end">
+        <di:waypoint x="3450" y="210" /><di:waypoint x="3502" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_rejection_to_notify_di" bpmnElement="flow_rejection_to_notify">
+        <di:waypoint x="2510" y="420" /><di:waypoint x="2560" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_notify_rejection_to_end_di" bpmnElement="flow_notify_rejection_to_end">
+        <di:waypoint x="2660" y="420" /><di:waypoint x="2712" y="420" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

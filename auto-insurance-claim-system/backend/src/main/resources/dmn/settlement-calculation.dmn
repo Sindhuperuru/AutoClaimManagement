@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_SettlementCalc"
+             name="Settlement Calculation Definitions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="settlementCalculationDecision" name="Settlement Amount Calculation Decision">
+    <decisionTable id="DecisionTable_SettlementCalc" hitPolicy="FIRST">
+      <input id="Input_CoverageType" label="Policy Coverage Type">
+        <inputExpression id="InputExpr_CoverageType" typeRef="string">
+          <text>coverageType</text>
+        </inputExpression>
+      </input>
+      <input id="Input_DamageSettlement" label="Estimated Damage ($)">
+        <inputExpression id="InputExpr_DamageSettlement" typeRef="double">
+          <text>estimatedDamage</text>
+        </inputExpression>
+      </input>
+      <input id="Input_DeductibleSettlement" label="Policy Deductible ($)">
+        <inputExpression id="InputExpr_DeductibleSettlement" typeRef="double">
+          <text>deductibleAmount</text>
+        </inputExpression>
+      </input>
+      <input id="Input_FaultPct" label="Claimant Fault %">
+        <inputExpression id="InputExpr_FaultPct" typeRef="double">
+          <text>claimantFaultPercentage</text>
+        </inputExpression>
+      </input>
+
+      <output id="Output_ApprovedAmt" label="Approved Payable Amount ($)" name="approvedAmount" typeRef="double" />
+      <output id="Output_DeductibleAppl" label="Deductible Applied ($)" name="deductibleApplied" typeRef="double" />
+      <output id="Output_DeprecAppl" label="Depreciation Applied ($)" name="depreciationApplied" typeRef="double" />
+      <output id="Output_SettlementRemarks" label="Settlement Formula Remarks" name="settlementRemarks" typeRef="string" />
+
+      <!-- Rule 1: Zero Depreciation Policy, 0% fault -->
+      <!-- Formula: Damage - Deductible (No depreciation) -->
+      <rule id="Rule_SC_1">
+        <inputEntry id="IE_SC_1_1"><text>"ZERO_DEPRECIATION"</text></inputEntry>
+        <inputEntry id="IE_SC_1_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_1_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_1_4"><text>&lt;= 0.0</text></inputEntry>
+        <outputEntry id="OE_SC_1_1"><text>estimatedDamage - deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_1_2"><text>deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_1_3"><text>0.00</text></outputEntry>
+        <outputEntry id="OE_SC_1_4"><text>"Zero-Depreciation rider applied. Full parts replacement with zero depreciation deductions."</text></outputEntry>
+      </rule>
+
+      <!-- Rule 2: Comprehensive Policy, 0% fault (standard 10% wear-and-tear depreciation on parts) -->
+      <rule id="Rule_SC_2">
+        <inputEntry id="IE_SC_2_1"><text>"COMPREHENSIVE"</text></inputEntry>
+        <inputEntry id="IE_SC_2_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_2_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_2_4"><text>&lt;= 0.0</text></inputEntry>
+        <outputEntry id="OE_SC_2_1"><text>(estimatedDamage * 0.90) - deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_2_2"><text>deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_2_3"><text>estimatedDamage * 0.10</text></outputEntry>
+        <outputEntry id="OE_SC_2_4"><text>"Comprehensive settlement applied with standard 10% parts depreciation and policy deductible."</text></outputEntry>
+      </rule>
+
+      <!-- Rule 3: Collision / Third Party with Shared Comparative Fault (e.g., 20% or 50% fault) -->
+      <rule id="Rule_SC_3">
+        <inputEntry id="IE_SC_3_1"><text>"COMPREHENSIVE","COLLISION"</text></inputEntry>
+        <inputEntry id="IE_SC_3_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_3_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_3_4"><text>&gt; 0.0</text></inputEntry>
+        <outputEntry id="OE_SC_3_1"><text>((estimatedDamage * 0.90) * (1.0 - (claimantFaultPercentage / 100.0))) - deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_3_2"><text>deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_3_3"><text>estimatedDamage * 0.10</text></outputEntry>
+        <outputEntry id="OE_SC_3_4"><text>"Comparative negligence reduction applied based on contributory fault percentage."</text></outputEntry>
+      </rule>
+
+      <!-- Rule 4: Default Fallback -->
+      <rule id="Rule_SC_Def">
+        <inputEntry id="IE_SC_Def_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_Def_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_Def_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_SC_Def_4"><text>-</text></inputEntry>
+        <outputEntry id="OE_SC_Def_1"><text>estimatedDamage - deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_Def_2"><text>deductibleAmount</text></outputEntry>
+        <outputEntry id="OE_SC_Def_3"><text>0.00</text></outputEntry>
+        <outputEntry id="OE_SC_Def_4"><text>"Standard settlement calculation applied."</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

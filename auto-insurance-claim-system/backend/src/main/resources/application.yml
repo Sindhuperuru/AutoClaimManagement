@@ -1,0 +1,106 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: auto-accident-claim-management
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:sqlite}
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 25MB
+      max-request-size: 50MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+# 1. SQLite Profile (Default: All business data saved directly to insurance.db)
+---
+spring:
+  config:
+    activate:
+      on-profile: sqlite
+  datasource:
+    url: jdbc:sqlite:insurance.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# 2. In-Memory H2 Fallback Profile
+---
+spring:
+  config:
+    activate:
+      on-profile: h2
+  datasource:
+    url: jdbc:h2:mem:auto_claim_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+# 3. Optional MySQL Profile
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/auto_claim_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+---
+# Camunda Platform 7 Configuration
+camunda:
+  bpm:
+    history-level: full
+    job-execution:
+      enabled: true
+      deployment-aware: false
+    admin-user:
+      id: admin
+      password: admin
+      firstName: Camunda
+      lastName: Administrator
+      email: admin@autoclaim.com
+    default-serialization-format: application/json
+    auto-deployment-enabled: true
+    generic-properties:
+      properties:
+        enforceHistoryTimeToLive: false
+        historyTimeToLive: P180D
+
+# Application Security and SLA Settings
+app:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    expiration-ms: 86400000 # 24 Hours
+  upload:
+    dir: ./uploads/claims/
+  sla:
+    agent-hours: 24
+    officer-hours: 48

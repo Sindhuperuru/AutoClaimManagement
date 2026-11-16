@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_DocVerification"
+             name="Document Verification Definitions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="documentVerificationDecision" name="Document Verification Decision">
+    <decisionTable id="DecisionTable_DocVerification" hitPolicy="FIRST">
+      <input id="Input_HasDL" label="Driving License Present">
+        <inputExpression id="InputExpr_DL" typeRef="boolean">
+          <text>hasDrivingLicense</text>
+        </inputExpression>
+      </input>
+      <input id="Input_HasRC" label="Vehicle RC Present">
+        <inputExpression id="InputExpr_RC" typeRef="boolean">
+          <text>hasRc</text>
+        </inputExpression>
+      </input>
+      <input id="Input_HasPhotos" label="Accident Photos Present">
+        <inputExpression id="InputExpr_Photos" typeRef="boolean">
+          <text>hasAccidentPhotos</text>
+        </inputExpression>
+      </input>
+      <input id="Input_HasFIR" label="Police FIR Present">
+        <inputExpression id="InputExpr_FIR" typeRef="boolean">
+          <text>hasPoliceFir</text>
+        </inputExpression>
+      </input>
+      <input id="Input_HasEstimate" label="Repair Estimate Present">
+        <inputExpression id="InputExpr_Estimate" typeRef="boolean">
+          <text>hasRepairEstimate</text>
+        </inputExpression>
+      </input>
+      <input id="Input_DamageAmt" label="Estimated Damage ($)">
+        <inputExpression id="InputExpr_DamageAmt" typeRef="double">
+          <text>damageAmount</text>
+        </inputExpression>
+      </input>
+
+      <output id="Output_DocsComplete" label="Documents Complete?" name="documentsComplete" typeRef="boolean" />
+      <output id="Output_MissingList" label="Missing Documents List" name="missingDocumentsList" typeRef="string" />
+      <output id="Output_Status" label="Verification Status" name="verificationStatus" typeRef="string" />
+
+      <!-- Rule 1: All documents present -->
+      <rule id="Rule_DV_1">
+        <inputEntry id="IE_DV_1_1"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_1_2"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_1_3"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_1_4"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_1_5"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_1_6"><text>-</text></inputEntry>
+        <outputEntry id="OE_DV_1_1"><text>true</text></outputEntry>
+        <outputEntry id="OE_DV_1_2"><text>"NONE"</text></outputEntry>
+        <outputEntry id="OE_DV_1_3"><text>"VERIFIED_COMPLETE"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 2: Low damage (< 2500), FIR not strictly mandatory if others present -->
+      <rule id="Rule_DV_2">
+        <inputEntry id="IE_DV_2_1"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_2_2"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_2_3"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_2_4"><text>false</text></inputEntry>
+        <inputEntry id="IE_DV_2_5"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_2_6"><text>&lt; 2500</text></inputEntry>
+        <outputEntry id="OE_DV_2_1"><text>true</text></outputEntry>
+        <outputEntry id="OE_DV_2_2"><text>"POLICE_FIR_WAIVED_MINOR_INCIDENT"</text></outputEntry>
+        <outputEntry id="OE_DV_2_3"><text>"VERIFIED_COMPLETE"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 3: High damage (>= 2500) missing FIR -->
+      <rule id="Rule_DV_3">
+        <inputEntry id="IE_DV_3_1"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_3_2"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_3_3"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_3_4"><text>false</text></inputEntry>
+        <inputEntry id="IE_DV_3_5"><text>true</text></inputEntry>
+        <inputEntry id="IE_DV_3_6"><text>&gt;= 2500</text></inputEntry>
+        <outputEntry id="OE_DV_3_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_DV_3_2"><text>"POLICE_FIR_MANDATORY_OVER_2500"</text></outputEntry>
+        <outputEntry id="OE_DV_3_3"><text>"INCOMPLETE_PENDING_FIR"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 4: Missing DL or RC -->
+      <rule id="Rule_DV_4">
+        <inputEntry id="IE_DV_4_1"><text>false</text></inputEntry>
+        <inputEntry id="IE_DV_4_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_4_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_4_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_4_5"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_4_6"><text>-</text></inputEntry>
+        <outputEntry id="OE_DV_4_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_DV_4_2"><text>"DRIVING_LICENSE_MISSING"</text></outputEntry>
+        <outputEntry id="OE_DV_4_3"><text>"INCOMPLETE_DOCUMENTS"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 5: Missing RC -->
+      <rule id="Rule_DV_5">
+        <inputEntry id="IE_DV_5_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_5_2"><text>false</text></inputEntry>
+        <inputEntry id="IE_DV_5_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_5_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_5_5"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_5_6"><text>-</text></inputEntry>
+        <outputEntry id="OE_DV_5_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_DV_5_2"><text>"VEHICLE_RC_MISSING"</text></outputEntry>
+        <outputEntry id="OE_DV_5_3"><text>"INCOMPLETE_DOCUMENTS"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 6: Missing Estimate -->
+      <rule id="Rule_DV_6">
+        <inputEntry id="IE_DV_6_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_6_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_6_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_6_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_6_5"><text>false</text></inputEntry>
+        <inputEntry id="IE_DV_6_6"><text>-</text></inputEntry>
+        <outputEntry id="OE_DV_6_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_DV_6_2"><text>"REPAIR_ESTIMATE_MISSING"</text></outputEntry>
+        <outputEntry id="OE_DV_6_3"><text>"INCOMPLETE_DOCUMENTS"</text></outputEntry>
+      </rule>
+
+      <!-- Default -->
+      <rule id="Rule_DV_Def">
+        <inputEntry id="IE_DV_Def_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_Def_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_Def_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_Def_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_Def_5"><text>-</text></inputEntry>
+        <inputEntry id="IE_DV_Def_6"><text>-</text></inputEntry>
+        <outputEntry id="OE_DV_Def_1"><text>false</text></outputEntry>
+        <outputEntry id="OE_DV_Def_2"><text>"MULTIPLE_DOCUMENTS_MISSING"</text></outputEntry>
+        <outputEntry id="OE_DV_Def_3"><text>"INCOMPLETE_DOCUMENTS"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

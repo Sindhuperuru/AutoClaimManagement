@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_RiskAssessment"
+             name="Claim Risk Assessment Definitions"
+             namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="claimRiskAssessmentDecision" name="Claim Risk Assessment Decision">
+    <decisionTable id="DecisionTable_RiskAssessment" hitPolicy="FIRST">
+      <input id="Input_Damage" label="Estimated Damage ($)">
+        <inputExpression id="InputExpr_Damage" typeRef="double">
+          <text>estimatedDamage</text>
+        </inputExpression>
+      </input>
+      <input id="Input_Delay" label="Delay in Reporting (Days)">
+        <inputExpression id="InputExpr_Delay" typeRef="integer">
+          <text>accidentDelayDays</text>
+        </inputExpression>
+      </input>
+      <input id="Input_PrevClaims" label="Prior Claims Count">
+        <inputExpression id="InputExpr_PrevClaims" typeRef="integer">
+          <text>previousClaimsCount</text>
+        </inputExpression>
+      </input>
+      <input id="Input_HasFIRRisk" label="Police FIR Available">
+        <inputExpression id="InputExpr_HasFIRRisk" typeRef="boolean">
+          <text>policeFirAvailable</text>
+        </inputExpression>
+      </input>
+      <input id="Input_PolicyAge" label="Policy Age (Months)">
+        <inputExpression id="InputExpr_PolicyAge" typeRef="integer">
+          <text>policyAgeMonths</text>
+        </inputExpression>
+      </input>
+
+      <output id="Output_ClaimRisk" label="Risk Classification" name="claimRisk" typeRef="string" />
+      <output id="Output_RiskScore" label="Risk Score (0-100)" name="riskScore" typeRef="integer" />
+      <output id="Output_Action" label="Recommended Action" name="recommendedAction" typeRef="string" />
+
+      <!-- Rule 1: High Risk - Fresh policy (<1 month) with huge damage (>15000) -->
+      <rule id="Rule_RA_1">
+        <inputEntry id="IE_RA_1_1"><text>&gt; 15000</text></inputEntry>
+        <inputEntry id="IE_RA_1_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_1_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_1_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_1_5"><text>&lt; 1</text></inputEntry>
+        <outputEntry id="OE_RA_1_1"><text>"HIGH"</text></outputEntry>
+        <outputEntry id="OE_RA_1_2"><text>88</text></outputEntry>
+        <outputEntry id="OE_RA_1_3"><text>"MANDATORY_SPECIAL_INVESTIGATION"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 2: High Risk - Excessive prior claims (>= 3) -->
+      <rule id="Rule_RA_2">
+        <inputEntry id="IE_RA_2_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_2_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_2_3"><text>&gt;= 3</text></inputEntry>
+        <inputEntry id="IE_RA_2_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_2_5"><text>-</text></inputEntry>
+        <outputEntry id="OE_RA_2_1"><text>"HIGH"</text></outputEntry>
+        <outputEntry id="OE_RA_2_2"><text>82</text></outputEntry>
+        <outputEntry id="OE_RA_2_3"><text>"HABITUAL_CLAIMANT_AUDIT"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 3: High Risk - Prolonged delay (> 14 days) and damage > 5000 -->
+      <rule id="Rule_RA_3">
+        <inputEntry id="IE_RA_3_1"><text>&gt; 5000</text></inputEntry>
+        <inputEntry id="IE_RA_3_2"><text>&gt; 14</text></inputEntry>
+        <inputEntry id="IE_RA_3_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_3_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_3_5"><text>-</text></inputEntry>
+        <outputEntry id="OE_RA_3_1"><text>"HIGH"</text></outputEntry>
+        <outputEntry id="OE_RA_3_2"><text>75</text></outputEntry>
+        <outputEntry id="OE_RA_3_3"><text>"DELAYED_CLAIM_INVESTIGATION"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 4: Medium Risk - Damage between 5000 and 15000 -->
+      <rule id="Rule_RA_4">
+        <inputEntry id="IE_RA_4_1"><text>[5000..15000]</text></inputEntry>
+        <inputEntry id="IE_RA_4_2"><text>&lt;= 14</text></inputEntry>
+        <inputEntry id="IE_RA_4_3"><text>&lt; 3</text></inputEntry>
+        <inputEntry id="IE_RA_4_4"><text>true</text></inputEntry>
+        <inputEntry id="IE_RA_4_5"><text>-</text></inputEntry>
+        <outputEntry id="OE_RA_4_1"><text>"MEDIUM"</text></outputEntry>
+        <outputEntry id="OE_RA_4_2"><text>45</text></outputEntry>
+        <outputEntry id="OE_RA_4_3"><text>"STANDARD_DESK_VERIFICATION"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 5: Medium Risk - No FIR but damage between 2500 and 5000 -->
+      <rule id="Rule_RA_5">
+        <inputEntry id="IE_RA_5_1"><text>[2500..5000]</text></inputEntry>
+        <inputEntry id="IE_RA_5_2"><text>&lt;= 14</text></inputEntry>
+        <inputEntry id="IE_RA_5_3"><text>&lt; 2</text></inputEntry>
+        <inputEntry id="IE_RA_5_4"><text>false</text></inputEntry>
+        <inputEntry id="IE_RA_5_5"><text>-</text></inputEntry>
+        <outputEntry id="OE_RA_5_1"><text>"MEDIUM"</text></outputEntry>
+        <outputEntry id="OE_RA_5_2"><text>52</text></outputEntry>
+        <outputEntry id="OE_RA_5_3"><text>"ADDITIONAL_WORKSHOP_INSPECTION"</text></outputEntry>
+      </rule>
+
+      <!-- Rule 6: Low Risk - Damage < 5000, reported promptly, low history -->
+      <rule id="Rule_RA_6">
+        <inputEntry id="IE_RA_6_1"><text>&lt; 5000</text></inputEntry>
+        <inputEntry id="IE_RA_6_2"><text>&lt;= 7</text></inputEntry>
+        <inputEntry id="IE_RA_6_3"><text>&lt;= 1</text></inputEntry>
+        <inputEntry id="IE_RA_6_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_6_5"><text>&gt;= 1</text></inputEntry>
+        <outputEntry id="OE_RA_6_1"><text>"LOW"</text></outputEntry>
+        <outputEntry id="OE_RA_6_2"><text>18</text></outputEntry>
+        <outputEntry id="OE_RA_6_3"><text>"FAST_TRACK_OFFICER_REVIEW"</text></outputEntry>
+      </rule>
+
+      <!-- Default rule -->
+      <rule id="Rule_RA_Def">
+        <inputEntry id="IE_RA_Def_1"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_Def_2"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_Def_3"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_Def_4"><text>-</text></inputEntry>
+        <inputEntry id="IE_RA_Def_5"><text>-</text></inputEntry>
+        <outputEntry id="OE_RA_Def_1"><text>"MEDIUM"</text></outputEntry>
+        <outputEntry id="OE_RA_Def_2"><text>50</text></outputEntry>
+        <outputEntry id="OE_RA_Def_3"><text>"STANDARD_OFFICER_REVIEW"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
